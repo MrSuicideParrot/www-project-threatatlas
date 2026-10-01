@@ -167,6 +167,7 @@ def test_valid_token_lists_all_tools(client: TestClient, admin_headers: dict):
         "create_custom_mitigation",
         "remove_mitigation_from_diagram",
         "list_component_templates",
+        "create_component_template",
         "apply_component_template",
         "get_product_security_status",
     }
@@ -809,6 +810,40 @@ def test_list_component_templates(client: TestClient, standard_user: User, user_
     groups = tool_value(result)
     all_names = [t["name"] for group in groups for t in group["components"]]
     assert "Redis Cache" in all_names
+
+
+def test_create_component_template(client: TestClient, admin_headers: dict, db: Session):
+    framework = _create_framework(db)
+    threat = _create_threat(db, framework, "Cache poisoning")
+    mitigation = _create_mitigation(db, framework, "Validate cache keys")
+
+    result = call_tool(client, admin_headers, "create_component_template", {
+        "name": "Session Cache",
+        "slug": "session-cache",
+        "category": "Databases",
+        "node_type": "datastore",
+        "description": "Stores user session data.",
+        "threat_ids": [threat.id],
+        "mitigation_ids": [mitigation.id],
+    })
+
+    created = tool_value(result)
+    assert created["name"] == "Session Cache"
+    assert created["is_custom"] is True
+    assert [item["id"] for item in created["threats"]] == [threat.id]
+    assert [item["id"] for item in created["mitigations"]] == [mitigation.id]
+
+
+def test_create_component_template_rejected_for_non_admin(
+    client: TestClient, standard_user: User, user_headers: dict,
+):
+    result = call_tool(client, user_headers, "create_component_template", {
+        "name": "Unauthorized Component",
+        "slug": "unauthorized-component",
+        "category": "Databases",
+        "node_type": "datastore",
+    })
+    assert "403" in tool_error_text(result)
 
 
 def test_apply_component_template(client: TestClient, standard_user: User, user_headers: dict, db: Session):

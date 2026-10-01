@@ -25,7 +25,7 @@ from app.routers import product_downloads as product_downloads_router
 from app.routers import products as products_router
 from app.routers import search as search_router
 from app.routers import threats as threats_router
-from app.routers.component_templates import ApplyTemplateRequest
+from app.routers.component_templates import ApplyTemplateRequest, ComponentTemplateCreate
 from app.schemas import (
     Diagram,
     DiagramCreate,
@@ -673,6 +673,39 @@ def list_component_templates(framework_id: int | None = None) -> list[dict]:
         db=actor.db,
     )
     return [g.model_dump(mode="json") for g in grouped]
+
+
+@mcp.tool()
+def create_component_template(
+    name: str,
+    slug: str,
+    category: str,
+    node_type: str,
+    icon: str | None = None,
+    description: str | None = None,
+    threat_ids: list[int] | None = None,
+    mitigation_ids: list[int] | None = None,
+) -> dict:
+    """Create an admin-managed custom component template and optionally link
+    knowledge-base threats and mitigations. Requires an administrator token."""
+    actor = get_mcp_actor()
+    payload = ComponentTemplateCreate(
+        name=name,
+        slug=slug,
+        category=category,
+        node_type=node_type,
+        icon=icon,
+        description=description,
+        threat_ids=threat_ids or [],
+        mitigation_ids=mitigation_ids or [],
+    )
+    created = _call(
+        component_templates_router.create_component_template,
+        payload=payload,
+        current_user=actor.user,
+        db=actor.db,
+    )
+    return created.model_dump(mode="json")
 
 
 @mcp.tool()
