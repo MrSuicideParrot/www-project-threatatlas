@@ -35,6 +35,7 @@ from app.schemas import (
     DiagramMitigationWithDetails,
     DiagramUpdate,
     Framework,
+    FrameworkCreate,
     Mitigation,
     MitigationCreate,
     Product,
@@ -401,6 +402,20 @@ def list_frameworks() -> list[dict]:
     actor = get_mcp_actor()
     frameworks = _call(frameworks_router.list_frameworks, current_user=actor.user, db=actor.db)
     return _dump_list(Framework, frameworks)
+
+
+@mcp.tool()
+def create_custom_framework(name: str, description: str | None = None) -> dict:
+    """Create a private threat-modeling framework for the authenticated user."""
+    actor = get_mcp_actor()
+    payload = FrameworkCreate(name=name, description=description)
+    created = _call(
+        frameworks_router.create_framework,
+        framework=payload,
+        current_user=actor.user,
+        db=actor.db,
+    )
+    return _dump(Framework, created)
 
 
 @mcp.tool()

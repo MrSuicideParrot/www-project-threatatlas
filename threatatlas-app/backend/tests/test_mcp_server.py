@@ -153,6 +153,7 @@ def test_valid_token_lists_all_tools(client: TestClient, admin_headers: dict):
         "list_diagram_mitigations",
         "search_threatatlas",
         "list_frameworks",
+        "create_custom_framework",
         "list_diagram_models",
         "create_diagram_model",
         "list_knowledge_base_mitigations",
@@ -655,6 +656,26 @@ def test_list_frameworks(client: TestClient, standard_user: User, user_headers: 
     result = call_tool(client, user_headers, "list_frameworks")
     names = [f["name"] for f in tool_value(result)]
     assert "STRIDE" in names
+
+
+def test_create_custom_framework(client: TestClient, standard_user: User, user_headers: dict):
+    result = call_tool(client, user_headers, "create_custom_framework", {
+        "name": "Custom Security Model",
+        "description": "Created through MCP",
+    })
+    created = tool_value(result)
+    assert created["name"] == "Custom Security Model"
+    assert created["description"] == "Created through MCP"
+    assert created["is_custom"] is True
+    assert created["user_id"] == standard_user.id
+
+
+def test_create_custom_framework_rejected_for_read_only(client: TestClient, db: Session):
+    read_only_user = _create_user(db, "readonly-framework@test.com", role=UserRole.READ_ONLY.value)
+    result = call_tool(client, make_auth_headers(read_only_user), "create_custom_framework", {
+        "name": "Read-only Framework",
+    })
+    assert "403" in tool_error_text(result)
 
 
 def test_create_diagram_model(client: TestClient, standard_user: User, user_headers: dict, db: Session):

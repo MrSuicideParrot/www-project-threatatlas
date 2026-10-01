@@ -119,6 +119,7 @@ same routers, RBAC, and audit logging as the REST API and web UI.
 | Tool | Description |
 |---|---|
 | `list_frameworks()` | List threat-modeling frameworks (e.g. STRIDE, LINDDUN) |
+| `create_custom_framework(name, description?)` | Create a custom threat-modeling framework |
 | `list_diagram_models(diagram_id)` | List the framework instances ("models") attached to a diagram |
 | `create_diagram_model(diagram_id, framework_id, name, description?)` | Bind a diagram to a framework — required before identifying threats/mitigations |
 
