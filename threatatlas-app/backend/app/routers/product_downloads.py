@@ -150,49 +150,69 @@ def _threats_mitigations_rows(product: ProductModel) -> tuple[list[dict], list[d
 
 
 def _threats_csv(threats: list[dict], mitigations: list[dict]) -> str:
-    buf = io.StringIO()
+    buf = io.StringIO(newline="")
 
     def _csv_sort_key(t):
         name = t.get("element_name", "")
         match = re.match(r'^(\d+)', name)
         return int(match.group(1)) if match else 9999
 
-    buf.write("# Threats\n")
-    threat_fields = ["Diagram", "Data Flow / Element", "Threat", "Category", "Status", "Severity", "Risk Score", "Description", "Mitigations"]
-    tw = csv.DictWriter(buf, fieldnames=threat_fields)
-    tw.writeheader()
+    fields = [
+        "Record Type",
+        "Diagram",
+        "Data Flow / Element",
+        "Threat",
+        "Mitigation",
+        "Category",
+        "Status",
+        "Severity",
+        "Risk Score",
+        "Description",
+        "Linked Threat ID",
+        "Mitigations",
+    ]
+    writer = csv.DictWriter(buf, fieldnames=fields)
+    writer.writeheader()
+
+    def write_record(record: dict) -> None:
+        writer.writerow({
+            key: " ".join(value.splitlines()) if isinstance(value, str) else value
+            for key, value in record.items()
+        })
+
     for t in sorted(threats, key=_csv_sort_key):
         linked_mits = [m for m in mitigations if m.get("linked_threat_id") == t.get("diagram_threat_id")]
         mits_text = "; ".join(f'{m["mitigation_name"]} ({m["status"]})' for m in linked_mits) if linked_mits else "None"
-        tw.writerow({
+        write_record({
+            "Record Type": "Threat",
             "Diagram": t.get("diagram", ""),
             "Data Flow / Element": t.get("element_name", t.get("element_id", "")),
             "Threat": t.get("threat_name", ""),
+            "Mitigation": "",
             "Category": t.get("category", ""),
             "Status": t.get("status", ""),
             "Severity": t.get("severity", ""),
             "Risk Score": t.get("risk_score", ""),
             "Description": t.get("description", ""),
+            "Linked Threat ID": "",
             "Mitigations": mits_text,
         })
-    if not threats:
-        buf.write("(no threats)\n")
 
-    buf.write("\n# Mitigations\n")
-    mit_fields = ["Diagram", "Data Flow / Element", "Mitigation", "Category", "Status", "Description"]
-    mw = csv.DictWriter(buf, fieldnames=mit_fields)
-    mw.writeheader()
     for m in mitigations:
-        mw.writerow({
+        write_record({
+            "Record Type": "Mitigation",
             "Diagram": m.get("diagram", ""),
             "Data Flow / Element": m.get("element_name", m.get("element_id", "")),
+            "Threat": "",
             "Mitigation": m.get("mitigation_name", ""),
             "Category": m.get("category", ""),
             "Status": m.get("status", ""),
+            "Severity": "",
+            "Risk Score": "",
             "Description": m.get("description", ""),
+            "Linked Threat ID": m.get("linked_threat_id", ""),
+            "Mitigations": "",
         })
-    if not mitigations:
-        buf.write("(no mitigations)\n")
 
     return buf.getvalue()
 

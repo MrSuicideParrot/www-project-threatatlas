@@ -7,6 +7,7 @@ correctly — this endpoint is the CI/CD contract, so its decision logic is
 worth pinning down.
 """
 
+import csv
 import io
 import json
 import zipfile
@@ -110,12 +111,25 @@ def test_download_diagrams_json(client: TestClient, standard_user: User, user_he
 
 def test_download_csv(client: TestClient, standard_user: User, user_headers: dict, db: Session):
     product = _build_product(db, standard_user, threats=[{"severity": "high"}], mitigations=[{"status": "implemented"}])
+    description = 'Adversaries gain "white-box" access, then collect data.\n\nMapped areas:\n- Model integrity\n- Privacy'
+    product.diagrams[0].diagram_threats[0].threat.description = description
+    product.diagrams[0].diagram_mitigations[0].mitigation.description = description
+    db.flush()
     resp = client.get(f"/api/products/{product.id}/download/threats-mitigations", headers=user_headers)
     assert resp.status_code == 200
     assert "text/csv" in resp.headers["content-type"]
-    body = resp.text
-    assert "# Threats" in body and "# Mitigations" in body
-    assert "Threat 0" in body and "Mitigation 0" in body
+    rows = list(csv.DictReader(io.StringIO(resp.text)))
+    assert [row["Record Type"] for row in rows] == ["Threat", "Mitigation"]
+    assert rows[0]["Threat"] == "Threat 0"
+    assert rows[0]["Mitigation"] == ""
+    assert rows[1]["Threat"] == ""
+    assert rows[1]["Mitigation"] == "Mitigation 0"
+    assert all(row["Description"] == " ".join(description.splitlines()) for row in rows)
+    assert all(None not in row and None not in row.values() for row in rows)
+    records = list(csv.reader(io.StringIO(resp.text), strict=True))
+    assert len(records) == 3
+    assert all(len(record) == 12 for record in records)
+    assert len(resp.text.splitlines()) == 3
 
 
 def test_download_html_report(client: TestClient, standard_user: User, user_headers: dict, db: Session):
