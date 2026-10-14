@@ -23,7 +23,7 @@ from docx.shared import Pt, RGBColor
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.models import (
@@ -49,9 +49,9 @@ def _load_product(product_id: int, user: UserModel, db: Session) -> ProductModel
     product = (
         db.query(ProductModel)
         .options(
-            joinedload(ProductModel.diagrams).joinedload(Diagram.diagram_threats).joinedload(DiagramThreat.threat),
-            joinedload(ProductModel.diagrams).joinedload(Diagram.diagram_mitigations).joinedload(DiagramMitigation.mitigation),
-            joinedload(ProductModel.collaborators),
+            selectinload(ProductModel.diagrams).selectinload(Diagram.diagram_threats).joinedload(DiagramThreat.threat),
+            selectinload(ProductModel.diagrams).selectinload(Diagram.diagram_mitigations).joinedload(DiagramMitigation.mitigation),
+            selectinload(ProductModel.collaborators),
         )
         .filter(ProductModel.id == product_id)
         .first()

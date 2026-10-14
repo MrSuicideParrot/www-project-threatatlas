@@ -14,6 +14,7 @@ import zipfile
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -130,6 +131,36 @@ def test_download_csv(client: TestClient, standard_user: User, user_headers: dic
     assert len(records) == 3
     assert all(len(record) == 12 for record in records)
     assert len(resp.text.splitlines()) == 3
+
+
+def test_download_csv_loads_collections_separately(client: TestClient, standard_user: User, user_headers: dict, db: Session):
+    product = _build_product(
+        db, standard_user,
+        threats=[{"severity": "high"}, {"severity": "low"}],
+        mitigations=[{"status": "proposed"}, {"status": "implemented"}],
+    )
+    product_id = product.id
+    db.expire_all()
+    statements = []
+
+    def capture_statement(connection, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    bind = db.get_bind()
+    event.listen(bind, "before_cursor_execute", capture_statement)
+    try:
+        resp = client.get(f"/api/products/{product_id}/download/threats-mitigations", headers=user_headers)
+    finally:
+        event.remove(bind, "before_cursor_execute", capture_statement)
+
+    assert resp.status_code == 200
+    assert len(list(csv.DictReader(io.StringIO(resp.text)))) == 4
+    assert any("FROM diagram_threats" in statement for statement in statements)
+    assert any("FROM diagram_mitigations" in statement for statement in statements)
+    assert not any(
+        "JOIN diagram_threats" in statement and "JOIN diagram_mitigations" in statement
+        for statement in statements
+    )
 
 
 def test_download_html_report(client: TestClient, standard_user: User, user_headers: dict, db: Session):
